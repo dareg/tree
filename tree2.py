@@ -1,3 +1,4 @@
+import argparse
 import xml.etree.ElementTree as ET
 import sys
 import pyfxtran
@@ -77,6 +78,7 @@ def analyze_file(filename):
         infos[proc_name] = callees
     return infos
 
+
 def generate_dotfile(all_infos):
     g = "digraph G{\n\tnode [shape=box, style=filled];\n"
     for info in all_infos:
@@ -87,7 +89,19 @@ def generate_dotfile(all_infos):
     g = g + "}\n"
     print(g)
 
-root = Path(sys.argv[1])
-all_infos = []
-for filename in root.glob("**/*.F90"):
-    all_infos.append(analyze_file(filename))
+
+def work_on_dir(dirname):
+    root = Path(dirname)
+    all_infos = []
+    for filename in root.glob("**/*.F90"):
+        all_infos.append(analyze_file(filename))
+    generate_dotfile(all_infos)
+
+
+parser = argparse.ArgumentParser(prog="tree")
+parser.add_argument("-p", "--pack")
+parser.add_argument("-d", "--directory")
+args = parser.parse_args()
+
+if args.directory:
+    work_on_dir(args.directory)
