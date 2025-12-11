@@ -6,6 +6,25 @@ import sys
 import pyfxtran
 from pathlib import Path
 
+
+class Node:
+    def __init__(self, name, filename=None):
+        self.name = name
+        self.callees = set()
+        self.filename = [filename]
+
+    def add_callee(self, callee):
+        self.callees.add(callee)
+
+    def add_filename(self, filename):
+        self.filename.append(filename)
+
+    def is_calling(self, callee):
+        return callee in self.callees
+
+
+nodes = {}
+
 ns = "{http://fxtran.net/#syntax}"
 
 
@@ -55,8 +74,6 @@ def analyze_file(filename):
     # src=simplify_xml(file)
     procs = get_procs(src)
 
-    infos = {}
-
     for proc in procs:
         # proc=remove_contained(proc)
         # print(ET.tostring(proc))
@@ -72,37 +89,40 @@ def analyze_file(filename):
 
         if not proc_name:
             continue
+
+        node = None
+        if proc_name in nodes:
+            node = nodes[proc_name]
+            node.add_filename(filename)
+        else:
+            node = Node(proc_name, filename)
+
         calls = proc.findall(".//call-stmt")
-        callees = set()
         for call in calls:
-            callees.add(call.find("procedure-designator/named-E/N/n").text)
-        # print(proc.find(f'./end-subroutine-stmt/subroutine-N/N/n').text)
-        infos[proc_name] = callees
-    return infos
+            callee = call.find("procedure-designator/named-E/N/n").text
+            node.add_callee(callee)
+
+        nodes[proc_name] = node
 
 
-def generate_dotfile(all_infos):
+def generate_dotfile():
     g = "digraph G{\n\tnode [shape=box, style=filled];\n"
-    for info in all_infos:
-        for proc_name in info:
-            g = g + f'{proc_name}[label="{proc_name}"];\n'
-            for callee in info[proc_name]:
-                g = g + f"{proc_name} -> {callee};\n"
+    for node in nodes:
+        g = g + f'{node}[label="{node}"];\n'
+        for callee in nodes[node].callees:
+            g = g + f"{node} -> {callee};\n"
     g = g + "}\n"
     print(g)
 
 
 def work_on_dir(dirname):
     root = Path(dirname)
-    all_infos = []
     for filename in root.glob("**/*.F90"):
-        all_infos.append(analyze_file(filename))
-    generate_dotfile(all_infos)
+        analyze_file(filename)
 
 
 def work_on_pack(dirname):
     root = Path(dirname)
-    all_infos = []
     main = set()
     local = set()
     for filename in root.glob("src/main/**/*.F90"):
@@ -121,9 +141,11 @@ def work_on_pack(dirname):
 parser = argparse.ArgumentParser(prog="tree")
 parser.add_argument("-p", "--pack")
 parser.add_argument("-d", "--directory")
+parser.add_argument("-f", "--from")
 args = parser.parse_args()
 
 if args.directory:
     work_on_dir(args.directory)
+    generate_dotfile()
 elif args.pack:
     work_on_pack(args.pack)
