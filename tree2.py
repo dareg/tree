@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 import sys
 import pyfxtran
 from pathlib import Path
+import subprocess
 
 
 class Node:
@@ -69,11 +70,19 @@ def remove_contained(proc):
 
 
 def analyze_file(filename):
-    # print("Working on ", filename)
-    file = pyfxtran.run(filename, ["-construct-tag", "-o", "-"])
+    print("Working on ", filename)
+    try:
+        file = pyfxtran.run(
+            filename,
+            ["-construct-tag", "-no-include", "-line-length", "9999", "-o", "-"],
+        )
+    except subprocess.CalledProcessError:
+        print(
+            f"Error when processing {filename} with fxtran, this file will be ignored"
+        )
+        return
 
     src = file.replace('xmlns="http://fxtran.net/#syntax"', "")
-    # src=simplify_xml(file)
     procs = get_procs(src)
 
     for proc in procs:
