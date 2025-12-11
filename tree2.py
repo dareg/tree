@@ -110,7 +110,8 @@ def analyze_file(filename):
 
         calls = proc.findall(".//call-stmt")
         for call in calls:
-            callee = call.find("procedure-designator/named-E/N/n").text
+            # the 'cpp' node might be added by a macro between 'N' and 'n' (see call abor1 in bator_pool_balance_mod.F90)
+            callee = call.find(".//procedure-designator/named-E/N//n").text
             node.add_callee(callee)
 
         nodes[proc_name] = node
@@ -144,13 +145,16 @@ def work_on_pack(dirname):
         main.add(str(filename).replace(str(root) + "/src/main/", ""))
     for filename in root.glob("src/local/**/*.F90"):
         local.add(str(filename).replace(str(root) + "/src/local/", ""))
-    print(main)
-    print(local)
-    print(main.intersection(local))
-    print(len(main), len(main - main.intersection(local)))
 
-    # all_infos.append(analyze_file(filename))
-    # generate_dotfile(all_infos)
+    filenames = []
+    for filename in main:
+        if filename not in local:
+            filenames.append(Path(root) / Path("src/main/") / Path(filename))
+    for filename in local:
+        filenames.append(Path(root) / Path("src/local/") / Path(filename))
+
+    for filename in filenames:
+        analyze_file(filename)
 
 
 def cut_before(root, nodes):
