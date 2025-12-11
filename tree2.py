@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# Judicaël Grasset - Metéo-France 2025
+
 import argparse
 import xml.etree.ElementTree as ET
 import sys
@@ -105,7 +107,7 @@ def analyze_file(filename):
         nodes[proc_name] = node
 
 
-def generate_dotfile():
+def generate_dotfile(nodes):
     g = "digraph G{\n\tnode [shape=box, style=filled];\n"
     for node in nodes:
         g = g + f'{node}[label="{node}"];\n'
@@ -138,14 +140,35 @@ def work_on_pack(dirname):
     # generate_dotfile(all_infos)
 
 
+def cut_before(root, nodes):
+    nodes2 = {}
+    if root not in nodes:
+        return
+    nodes2[root] = nodes[root]
+    to_study = [root]
+    while len(to_study) > 0:
+        if to_study[0] in nodes:
+            nodes2[to_study[0]] = nodes[to_study[0]]
+            for callee in nodes[to_study[0]].callees:
+                to_study.append(callee)
+        to_study.pop(0)
+    return nodes2
+
+
 parser = argparse.ArgumentParser(prog="tree")
 parser.add_argument("-p", "--pack")
 parser.add_argument("-d", "--directory")
-parser.add_argument("-f", "--from")
+parser.add_argument("-f", "--cutfrom")
+parser.add_argument("--dot", action="store_true")
 args = parser.parse_args()
 
 if args.directory:
     work_on_dir(args.directory)
-    generate_dotfile()
 elif args.pack:
     work_on_pack(args.pack)
+
+if args.cutfrom:
+    nodes = cut_before(args.cutfrom, nodes)
+
+if args.dot:
+    generate_dotfile(nodes)
