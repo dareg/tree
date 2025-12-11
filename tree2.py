@@ -117,7 +117,8 @@ def generate_dotfile(nodes):
         for callee in nodes[node].callees:
             g = g + f"{node} -> {callee};\n"
     g = g + "}\n"
-    print(g)
+    fh = open("g.dot", "w")
+    fh.write(g)
 
 
 def work_on_dir(dirname):
