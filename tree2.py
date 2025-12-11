@@ -110,7 +110,10 @@ def analyze_file(filename):
 def generate_dotfile(nodes):
     g = "digraph G{\n\tnode [shape=box, style=filled];\n"
     for node in nodes:
-        g = g + f'{node}[label="{node}"];\n'
+        label = node
+        for filename in nodes[node].filename:
+            label += "\\n" + filename.name
+        g = g + f'{node}[label="{label}"];\n'
         for callee in nodes[node].callees:
             g = g + f"{node} -> {callee};\n"
     g = g + "}\n"
