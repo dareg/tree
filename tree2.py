@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import xml.etree.ElementTree as ET
 import sys
@@ -98,6 +100,24 @@ def work_on_dir(dirname):
     generate_dotfile(all_infos)
 
 
+def work_on_pack(dirname):
+    root = Path(dirname)
+    all_infos = []
+    main = set()
+    local = set()
+    for filename in root.glob("src/main/**/*.F90"):
+        main.add(str(filename).replace(str(root) + "/src/main/", ""))
+    for filename in root.glob("src/local/**/*.F90"):
+        local.add(str(filename).replace(str(root) + "/src/local/", ""))
+    print(main)
+    print(local)
+    print(main.intersection(local))
+    print(len(main), len(main - main.intersection(local)))
+
+    # all_infos.append(analyze_file(filename))
+    # generate_dotfile(all_infos)
+
+
 parser = argparse.ArgumentParser(prog="tree")
 parser.add_argument("-p", "--pack")
 parser.add_argument("-d", "--directory")
@@ -105,3 +125,5 @@ args = parser.parse_args()
 
 if args.directory:
     work_on_dir(args.directory)
+elif args.pack:
+    work_on_pack(args.pack)
