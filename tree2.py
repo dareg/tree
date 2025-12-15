@@ -2,6 +2,7 @@
 
 # Judicaël Grasset - Metéo-France 2025
 
+import sqlite3
 import argparse
 import xml.etree.ElementTree as ET
 import sys
@@ -131,6 +132,75 @@ def generate_dotfile(nodes):
     fh.write(g)
 
 
+def generate_sqlite(nodes):
+    conn = sqlite3.connect("g.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""DROP TABLE IF EXISTS Proc;    """)
+    cursor.execute("""DROP TABLE IF EXISTS Call;    """)
+    cursor.execute(
+        """
+    CREATE TABLE IF NOT EXISTS Proc (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        CONSTRAINT unq UNIQUE(name)
+    )
+    """
+    )
+    cursor.execute(
+        """
+    CREATE TABLE IF NOT EXISTS Call (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        caller INTEGER,
+        callee INTEGER,
+        FOREIGN KEY (caller) REFERENCES Proc(id),
+        FOREIGN KEY (callee) REFERENCES Proc(id)
+    )
+    """
+    )
+    conn.commit()
+
+    # insert all procedures
+    for node in nodes:
+        label = node
+        cursor.execute("""INSERT INTO Proc (name) VALUES (?)""", (node,))
+    for node in nodes:
+        for callee in nodes[node].callees:
+            cursor.execute(
+                """INSERT INTO Proc (name) VALUES (?) ON CONFLICT DO NOTHING""",
+                (callee,),
+            )
+
+    # add all the calls
+    for node in nodes:
+        for callee in nodes[node].callees:
+            cursor.execute(
+                """SELECT id FROM Proc WHERE name = ? ORDER BY id DESC LIMIT 1""",
+                (node,),
+            )
+            caller_id = cursor.fetchone()[0]
+            cursor.execute(
+                """SELECT id FROM Proc WHERE name = ? ORDER BY id DESC LIMIT 1""",
+                (callee,),
+            )
+            res = cursor.fetchone()
+            if not res:
+                continue
+            callee_id = res[0]
+            print(f"{node}({caller_id}) -> {callee}({callee_id})")
+
+            cursor.execute(
+                """INSERT INTO Call (caller,callee) VALUES (?,?)""",
+                (
+                    caller_id,
+                    callee_id,
+                ),
+            )
+
+    conn.commit()
+    conn.close()
+
+
 def work_on_dir(dirname):
     root = Path(dirname)
     for filename in root.glob("**/*.F90"):
@@ -177,6 +247,7 @@ parser.add_argument("-p", "--pack")
 parser.add_argument("-d", "--directory")
 parser.add_argument("-f", "--cutfrom")
 parser.add_argument("--dot", action="store_true")
+parser.add_argument("--db", action="store_true")
 args = parser.parse_args()
 
 if args.directory:
@@ -189,3 +260,5 @@ if args.cutfrom:
 
 if args.dot:
     generate_dotfile(nodes)
+if args.db:
+    generate_sqlite(nodes)
