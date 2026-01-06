@@ -31,6 +31,8 @@ nodes = {}
 
 ns = "{http://fxtran.net/#syntax}"
 
+to_excludes = set()
+
 
 def simplify_xml(lines):
     # remove namespace, add node containing subroutine
@@ -102,6 +104,9 @@ def analyze_file(filename):
         if not proc_name:
             continue
 
+        if proc_name in to_excludes:
+            continue
+
         node = None
         if proc_name in nodes:
             node = nodes[proc_name]
@@ -113,6 +118,9 @@ def analyze_file(filename):
         for call in calls:
             # the 'cpp' node might be added by a macro between 'N' and 'n' (see call abor1 in bator_pool_balance_mod.F90)
             callee = call.find(".//procedure-designator/named-E/N//n").text
+            if callee in to_excludes:
+                continue
+
             node.add_callee(callee)
 
         nodes[proc_name] = node
@@ -242,6 +250,13 @@ def cut_before(root, nodes):
     return nodes2
 
 
+def read_excludes_list(filename):
+    with open(filename, "r") as fh:
+        for line in fh:
+            if line:
+                to_excludes.add(line.strip().upper())
+
+
 parser = argparse.ArgumentParser(prog="tree")
 parser.add_argument("-p", "--pack")
 parser.add_argument("-d", "--directory")
@@ -252,7 +267,15 @@ parser.add_argument(
 )
 parser.add_argument("--dot", action="store_true")
 parser.add_argument("--db", action="store_true")
+parser.add_argument(
+    "-e",
+    "--excludes",
+    help="File containing on each line a subroutine name to exclude from the graph",
+)
 args = parser.parse_args()
+
+if args.excludes:
+    read_excludes_list(args.excludes)
 
 if args.directory:
     work_on_dir(args.directory)
