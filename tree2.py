@@ -245,7 +245,11 @@ def cut_before(root, nodes):
 parser = argparse.ArgumentParser(prog="tree")
 parser.add_argument("-p", "--pack")
 parser.add_argument("-d", "--directory")
-parser.add_argument("-f", "--cutfrom")
+parser.add_argument(
+    "-f",
+    "--cutfrom",
+    help="Only shows subroutines called from this subroutine or one of its callee",
+)
 parser.add_argument("--dot", action="store_true")
 parser.add_argument("--db", action="store_true")
 args = parser.parse_args()
