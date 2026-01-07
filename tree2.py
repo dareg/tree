@@ -9,6 +9,7 @@ import sys
 import pyfxtran
 from pathlib import Path
 import subprocess
+from collections import Counter
 
 
 class Node:
@@ -271,6 +272,19 @@ def keep_known(nodes):
     return nodes
 
 
+def stats(nodes):
+    called = {}
+    for node in nodes:
+        for callee in nodes[node].callees:
+            if callee in called:
+                called[callee] += 1
+            else:
+                called[callee] = 0
+    most_common = Counter(called).most_common()
+    for i in range(3):
+        print(f"{most_common[i][0]} is called {most_common[i][1]} times")
+
+
 def main():
     parser = argparse.ArgumentParser(prog="tree")
     parser.add_argument("-p", "--pack")
@@ -282,6 +296,12 @@ def main():
     )
     parser.add_argument("--dot", action="store_true")
     parser.add_argument("--db", action="store_true")
+    parser.add_argument(
+        "-s",
+        "--stats",
+        action="store_true",
+        help="Show some statistics after the execution",
+    )
     parser.add_argument(
         "-e",
         "--excludes",
@@ -315,6 +335,9 @@ def main():
         generate_dotfile(nodes)
     if args.db:
         generate_sqlite(nodes)
+
+    if args.stats:
+        stats(nodes)
 
 
 main()
