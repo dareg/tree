@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Judicaël Grasset - Metéo-France 2025
+# Judicaël Grasset - Metéo-France 2025-2026
 
 import sqlite3
 import argparse
@@ -27,11 +27,7 @@ class Node:
         return callee in self.callees
 
 
-nodes = {}
-
 ns = "{http://fxtran.net/#syntax}"
-
-to_excludes = set()
 
 
 def simplify_xml(lines):
@@ -72,7 +68,7 @@ def remove_contained(proc):
     return proc
 
 
-def analyze_file(filename):
+def analyze_file(filename, nodes, to_excludes):
     print("Working on ", filename)
     try:
         file = pyfxtran.run(
@@ -209,16 +205,20 @@ def generate_sqlite(nodes):
     conn.close()
 
 
-def work_on_dir(dirname):
+def work_on_dir(dirname, to_excludes):
     root = Path(dirname)
+    nodes = {}
     for filename in root.glob("**/*.F90"):
-        analyze_file(filename)
+        analyze_file(filename, nodes, to_excludes)
+
+    return nodes
 
 
-def work_on_pack(dirname):
+def work_on_pack(dirname, to_excludes):
     root = Path(dirname)
     main = set()
     local = set()
+    nodes = {}
     for filename in root.glob("src/main/**/*.F90"):
         main.add(str(filename).replace(str(root) + "/src/main/", ""))
     for filename in root.glob("src/local/**/*.F90"):
@@ -232,7 +232,9 @@ def work_on_pack(dirname):
         filenames.append(Path(root) / Path("src/local/") / Path(filename))
 
     for filename in filenames:
-        analyze_file(filename)
+        analyze_file(filename, nodes, to_excludes)
+
+    return nodes
 
 
 def cut_before(root, nodes):
@@ -251,41 +253,68 @@ def cut_before(root, nodes):
 
 
 def read_excludes_list(filename):
+    to_excludes = set()
     with open(filename, "r") as fh:
         for line in fh:
             if line:
                 to_excludes.add(line.strip().upper())
+    return to_excludes
 
 
-parser = argparse.ArgumentParser(prog="tree")
-parser.add_argument("-p", "--pack")
-parser.add_argument("-d", "--directory")
-parser.add_argument(
-    "-f",
-    "--cutfrom",
-    help="Only shows subroutines called from this subroutine or one of its callee",
-)
-parser.add_argument("--dot", action="store_true")
-parser.add_argument("--db", action="store_true")
-parser.add_argument(
-    "-e",
-    "--excludes",
-    help="File containing on each line a subroutine name to exclude from the graph",
-)
-args = parser.parse_args()
+def keep_known(nodes):
+    for node in nodes:
+        callees2 = set()
+        for callee in nodes[node].callees:
+            if callee in nodes:
+                callees2.add(callee)
+        nodes[node].callees = callees2
+    return nodes
 
-if args.excludes:
-    read_excludes_list(args.excludes)
 
-if args.directory:
-    work_on_dir(args.directory)
-elif args.pack:
-    work_on_pack(args.pack)
+def main():
+    parser = argparse.ArgumentParser(prog="tree")
+    parser.add_argument("-p", "--pack")
+    parser.add_argument("-d", "--directory")
+    parser.add_argument(
+        "-f",
+        "--cutfrom",
+        help="Only shows subroutines called from this subroutine or one of its callee",
+    )
+    parser.add_argument("--dot", action="store_true")
+    parser.add_argument("--db", action="store_true")
+    parser.add_argument(
+        "-e",
+        "--excludes",
+        help="File containing on each line a subroutine name to exclude from the graph",
+    )
+    parser.add_argument(
+        "-k",
+        "--known",
+        help="Only show the calls to subroutines that are known",
+        action="store_true",
+    )
+    args = parser.parse_args()
 
-if args.cutfrom:
-    nodes = cut_before(args.cutfrom, nodes)
+    nodes = {}
+    to_excludes = set()
+    if args.excludes:
+        to_excludes = read_excludes_list(args.excludes)
 
-if args.dot:
-    generate_dotfile(nodes)
-if args.db:
-    generate_sqlite(nodes)
+    if args.directory:
+        nodes = work_on_dir(args.directory, to_excludes)
+    elif args.pack:
+        nodes = work_on_pack(args.pack, to_excludes)
+
+    if args.known:
+        nodes = keep_known(nodes)
+
+    if args.cutfrom:
+        nodes = cut_before(args.cutfrom, nodes)
+
+    if args.dot:
+        generate_dotfile(nodes)
+    if args.db:
+        generate_sqlite(nodes)
+
+
+main()
