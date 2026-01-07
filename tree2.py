@@ -286,7 +286,7 @@ def stats(nodes):
         print(f"{most_common[i][0]} is called {most_common[i][1]} times")
 
 
-def main():
+def handle_cli_options():
     parser = argparse.ArgumentParser(prog="tree")
     parser.add_argument("-p", "--pack")
     parser.add_argument("-d", "--directory")
@@ -316,7 +316,11 @@ def main():
         action="store_true",
     )
     args = parser.parse_args()
+    return args
 
+
+def main():
+    args = handle_cli_options()
     nodes = {}
     to_excludes = set()
     if args.excludes:
