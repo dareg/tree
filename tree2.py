@@ -69,8 +69,9 @@ def remove_contained(proc):
     return proc
 
 
-def analyze_file(filename, nodes, to_excludes):
-    print("Working on ", filename)
+def analyze_file(filename, nodes, to_excludes, verbose):
+    if verbose:
+        print("Working on ", filename)
     try:
         file = pyfxtran.run(
             filename,
@@ -206,16 +207,16 @@ def generate_sqlite(nodes):
     conn.close()
 
 
-def work_on_dir(dirname, to_excludes):
+def work_on_dir(dirname, to_excludes, verbose):
     root = Path(dirname)
     nodes = {}
     for filename in root.glob("**/*.F90"):
-        analyze_file(filename, nodes, to_excludes)
+        analyze_file(filename, nodes, to_excludes, verbose)
 
     return nodes
 
 
-def work_on_pack(dirname, to_excludes):
+def work_on_pack(dirname, to_excludes, verbose):
     root = Path(dirname)
     main = set()
     local = set()
@@ -233,7 +234,7 @@ def work_on_pack(dirname, to_excludes):
         filenames.append(Path(root) / Path("src/local/") / Path(filename))
 
     for filename in filenames:
-        analyze_file(filename, nodes, to_excludes)
+        analyze_file(filename, nodes, to_excludes, verbose)
 
     return nodes
 
@@ -294,6 +295,7 @@ def main():
         "--cutfrom",
         help="Only shows subroutines called from this subroutine or one of its callee",
     )
+    parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--dot", action="store_true")
     parser.add_argument("--db", action="store_true")
     parser.add_argument(
@@ -321,9 +323,9 @@ def main():
         to_excludes = read_excludes_list(args.excludes)
 
     if args.directory:
-        nodes = work_on_dir(args.directory, to_excludes)
+        nodes = work_on_dir(args.directory, to_excludes, args.verbose)
     elif args.pack:
-        nodes = work_on_pack(args.pack, to_excludes)
+        nodes = work_on_pack(args.pack, to_excludes, args.verbose)
 
     if args.known:
         nodes = keep_known(nodes)
