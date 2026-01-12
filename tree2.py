@@ -101,6 +101,7 @@ def analyze_file(filename, nodes, to_excludes, verbose):
 
         if not proc_name:
             continue
+        proc_name = proc_name.upper()
 
         if proc_name in to_excludes:
             continue
@@ -241,8 +242,9 @@ def work_on_pack(dirname, to_excludes, verbose):
 
 def cut_before(root, nodes):
     nodes2 = {}
+    root = root.upper()
     if root not in nodes:
-        return
+        return nodes2
     nodes2[root] = nodes[root]
     to_study = [root]
     while len(to_study) > 0:
@@ -336,6 +338,12 @@ def main():
 
     if args.cutfrom:
         nodes = cut_before(args.cutfrom, nodes)
+        if not nodes:
+            print(
+                f"Couldn't find subroutine {args.cutfrom} in the analyzed files",
+                file=sys.stderr,
+            )
+            return
 
     if args.dot:
         generate_dotfile(nodes)
