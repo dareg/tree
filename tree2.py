@@ -204,7 +204,6 @@ def generate_sqlite(nodes):
             if not res:
                 continue
             callee_id = res[0]
-            print(f"{node}({caller_id}) -> {callee}({callee_id})")
 
             cursor.execute(
                 """INSERT INTO Call (caller,callee) VALUES (?,?)""",
