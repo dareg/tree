@@ -260,10 +260,10 @@ def cut_before(root, nodes):
     root = root.upper()
     if root not in nodes:
         return nodes2
-    nodes2[root] = nodes[root]
     to_study = [root]
+
     while len(to_study) > 0:
-        if to_study[0] in nodes:
+        if to_study[0] in nodes and to_study[0] not in nodes2:
             nodes2[to_study[0]] = nodes[to_study[0]]
             for callee in nodes[to_study[0]].callees:
                 to_study.append(callee)
