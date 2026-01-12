@@ -123,6 +123,7 @@ def analyze_file(filename, nodes, to_excludes, verbose):
         for call in calls:
             # the 'cpp' node might be added by a macro between 'N' and 'n' (see call abor1 in bator_pool_balance_mod.F90)
             callee = call.find(".//procedure-designator/named-E/N//n").text
+            callee = callee.upper()
             if callee in to_excludes:
                 continue
 
