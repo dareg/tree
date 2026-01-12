@@ -155,8 +155,8 @@ def generate_sqlite(nodes):
     conn = sqlite3.connect("g.db")
     cursor = conn.cursor()
 
-    cursor.execute("""DROP TABLE IF EXISTS Proc;    """)
-    cursor.execute("""DROP TABLE IF EXISTS Call;    """)
+    cursor.execute("""DROP TABLE IF EXISTS Proc;""")
+    cursor.execute("""DROP TABLE IF EXISTS Call;""")
     cursor.execute(
         """
     CREATE TABLE IF NOT EXISTS Proc (
