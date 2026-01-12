@@ -15,6 +15,7 @@ from collections import Counter
 class Node:
     def __init__(self, name, filename=None):
         self.name = name
+        self.drhack = False
         self.callees = set()
         self.filename = [filename]
 
@@ -128,10 +129,15 @@ def analyze_file(filename, nodes, to_excludes, verbose):
 def generate_dotfile(nodes):
     g = "digraph G{\n\tnode [shape=box, style=filled];\n"
     for node in nodes:
+        node_color = ""
         label = node
         for filename in nodes[node].filename:
             label += "\\n" + filename.name
-        g = g + f'{node}[label="{label}"];\n'
+
+        if nodes[node].drhack:
+            node_color = ', style=filled, fillcolor="#f7c93d"'
+
+        g = g + f'{node}[label="{label}"{node_color}];\n'
         for callee in nodes[node].callees:
             g = g + f"{node} -> {callee};\n"
     g = g + "}\n"
@@ -150,6 +156,7 @@ def generate_sqlite(nodes):
     CREATE TABLE IF NOT EXISTS Proc (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
+        drhack INTEGER NOT NULL,
         CONSTRAINT unq UNIQUE(name)
     )
     """
@@ -170,12 +177,15 @@ def generate_sqlite(nodes):
     # insert all procedures
     for node in nodes:
         label = node
-        cursor.execute("""INSERT INTO Proc (name) VALUES (?)""", (node,))
+        cursor.execute(
+            """INSERT INTO Proc (name, drhack) VALUES (?,?)""",
+            (node, nodes[node].drhack),
+        )
     for node in nodes:
         for callee in nodes[node].callees:
             cursor.execute(
-                """INSERT INTO Proc (name) VALUES (?) ON CONFLICT DO NOTHING""",
-                (callee,),
+                """INSERT INTO Proc (name, drhack) VALUES (?,?) ON CONFLICT DO NOTHING""",
+                (callee, 0),
             )
 
     # add all the calls
@@ -287,6 +297,31 @@ def stats(nodes):
     for i in range(3):
         print(f"{most_common[i][0]} is called {most_common[i][1]} times")
 
+    drhack = 0
+    for node in nodes:
+        if nodes[node].drhack:
+            drhack += 1
+    print(drhack, "subroutines has been seen in the drhack.txt file")
+
+
+def read_drhack(path):
+    called = set()
+    with open(path, "r") as fh:
+        for line in fh:
+            line = line.replace("<", "")
+            line = line.replace(">", "")
+            line = line.replace("/", "")
+            line = line.strip()
+            called.add(line)
+    return called
+
+
+def mark_as_seen_in_drhack(path, nodes):
+    called = read_drhack(path)
+    for node in nodes:
+        if nodes[node].name in called:
+            nodes[node].drhack = True
+
 
 def handle_cli_options():
     parser = argparse.ArgumentParser(prog="tree")
@@ -317,6 +352,10 @@ def handle_cli_options():
         help="Only show the calls to subroutines that are known",
         action="store_true",
     )
+    parser.add_argument(
+        "--drhack",
+        help="Highlights the subroutines that are also in the drhack.txt file",
+    )
     args = parser.parse_args()
     return args
 
@@ -344,6 +383,9 @@ def main():
                 file=sys.stderr,
             )
             return
+
+    if args.drhack:
+        mark_as_seen_in_drhack(args.drhack, nodes)
 
     if args.dot:
         generate_dotfile(nodes)
