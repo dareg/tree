@@ -61,6 +61,7 @@ def get_procs(xml_file):
     root = ET.fromstring(xml_file)
     procs = root.findall(".//program-unit[subroutine-stmt]")
     procs.extend(root.findall(".//program-unit[function-stmt]"))
+    procs.extend(root.findall(".//program-unit[program-stmt]"))
     return procs
 
 
@@ -99,6 +100,10 @@ def analyze_file(filename, nodes, to_excludes, verbose):
         func = proc.find(f"./function-stmt/function-N/N/n")
         if func is not None:
             proc_name = func.text
+
+        prog = proc.find(f"./program-stmt/program-N/N/n")
+        if prog is not None:
+            proc_name = prog.text
 
         if not proc_name:
             continue
