@@ -289,7 +289,7 @@ def keep_known(nodes):
     return nodes
 
 
-def stats(nodes):
+def stats(nodes, path):
     called = {}
     for node in nodes:
         for callee in nodes[node].callees:
@@ -306,6 +306,16 @@ def stats(nodes):
         if nodes[node].drhack:
             drhack += 1
     print(drhack, "subroutines has been seen in the drhack.txt file")
+
+    if path:
+        only_drhack = 0
+        for sub in read_drhack(path):
+            if sub not in nodes:
+                only_drhack += 1
+        print(
+            only_drhack,
+            "subroutines were in drhack.txt but not in analyzed source files",
+        )
 
 
 def read_drhack(path):
@@ -397,7 +407,7 @@ def main():
         generate_sqlite(nodes)
 
     if args.stats:
-        stats(nodes)
+        stats(nodes, args.drhack)
 
 
 main()
