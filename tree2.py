@@ -4,6 +4,7 @@
 
 import sqlite3
 import argparse
+import textwrap
 import xml.etree.ElementTree as ET
 import sys
 import pyfxtran
@@ -364,7 +365,16 @@ def nounused(nodes):
 
 
 def handle_cli_options():
-    parser = argparse.ArgumentParser(prog="tree")
+    parser = argparse.ArgumentParser(
+        prog="tree",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent(
+            """\
+        One can use the dot command to generate an image from the generated dotfile:
+            dot -Ksfdp -Goverlap=scale -Tpng -o g.png g.dot
+        """
+        ),
+    )
     parser.add_argument("-p", "--pack")
     parser.add_argument("-d", "--directory")
     parser.add_argument(
