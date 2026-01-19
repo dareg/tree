@@ -301,7 +301,8 @@ def stats(nodes, path):
             else:
                 called[callee] = 0
     most_common = Counter(called).most_common()
-    for i in range(3):
+
+    for i in range(min(3, len(most_common))):
         print(f"{most_common[i][0]} is called {most_common[i][1]} times")
 
     drhack = 0
@@ -340,6 +341,28 @@ def mark_as_seen_in_drhack(path, nodes):
             nodes[node].drhack = True
 
 
+def nounused(nodes):
+    # Remove from the list of nodes, all the nodes that are neither called neither calling something
+    all_callees = set()
+    for node in nodes:
+        all_callees.update(nodes[node].callees)
+
+    nodes2 = {}
+    for node in nodes:
+        to_add = False
+        # If it'a called
+        if node in all_callees:
+            to_add = True
+        # If it's calling something
+        if nodes[node].callees:
+            to_add = True
+
+        if to_add:
+            nodes2[node] = nodes[node]
+
+    return nodes2
+
+
 def handle_cli_options():
     parser = argparse.ArgumentParser(prog="tree")
     parser.add_argument("-p", "--pack")
@@ -370,6 +393,11 @@ def handle_cli_options():
         action="store_true",
     )
     parser.add_argument(
+        "--nounused",
+        help="Remove the procedures that are neither called nor calling something",
+        action="store_true",
+    )
+    parser.add_argument(
         "--drhack",
         help="Highlights the subroutines that are also in the drhack.txt file",
     )
@@ -391,6 +419,9 @@ def main():
 
     if args.known:
         nodes = keep_known(nodes)
+
+    if args.nounused:
+        nodes = nounused(nodes)
 
     if args.cutfrom:
         nodes = cut_before(args.cutfrom, nodes)
