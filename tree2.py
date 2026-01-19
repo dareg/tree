@@ -275,6 +275,8 @@ def read_excludes_list(filename):
     to_excludes = set()
     with open(filename, "r") as fh:
         for line in fh:
+            if line.startswith("#"):
+                continue
             if line:
                 to_excludes.add(line.strip().upper())
     return to_excludes
