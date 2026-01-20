@@ -342,6 +342,15 @@ def mark_as_seen_in_drhack(path, nodes):
             nodes[node].drhack = True
 
 
+def remove_if_not_in_drhack(path, nodes):
+    called = read_drhack(path)
+    nodes2 = {}
+    for node in nodes:
+        if node in called:
+            nodes2[node] = nodes[node]
+    return nodes2
+
+
 def nounused(nodes):
     # Remove from the list of nodes, all the nodes that are neither called neither calling something
     all_callees = set()
@@ -411,6 +420,10 @@ def handle_cli_options():
         "--drhack",
         help="Highlights the subroutines that are also in the drhack.txt file",
     )
+    parser.add_argument(
+        "--drhackonly",
+        help="Show only the subroutines that are in the parsed codebase and in the drhack.txt file",
+    )
     args = parser.parse_args()
     return args
 
@@ -444,6 +457,9 @@ def main():
 
     if args.drhack:
         mark_as_seen_in_drhack(args.drhack, nodes)
+
+    if args.drhackonly:
+        nodes = remove_if_not_in_drhack(args.drhackonly, nodes)
 
     if args.dot:
         generate_dotfile(nodes)
