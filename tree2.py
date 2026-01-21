@@ -60,6 +60,13 @@ def simplify_xml(lines):
 
 def get_procs(xml_file):
     root = ET.fromstring(xml_file)
+
+    # Remove nodes containing the interfaces (usually modi_* files)
+    for parent in root.iter():
+        children_to_remove = parent.findall("interface-construct")
+        for child in children_to_remove:
+            parent.remove(child)
+
     procs = root.findall(".//program-unit[subroutine-stmt]")
     procs.extend(root.findall(".//program-unit[function-stmt]"))
     procs.extend(root.findall(".//program-unit[program-stmt]"))
