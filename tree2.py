@@ -48,16 +48,6 @@ def simplify_xml(lines):
     return "".join(lines2)
 
 
-# def get_procs(xml_file):
-#    root = ET.fromstring(xml_file)
-#    procs=[]
-#    for elem in root.iter():
-#        if elem.tag == "sub":
-#            procs.append(elem)
-#
-#    return procs
-
-
 def get_procs(xml_file):
     root = ET.fromstring(xml_file)
 
@@ -79,9 +69,8 @@ def remove_contained(proc):
     return proc
 
 
-def analyze_file(filename, nodes, to_excludes, verbose):
-    if verbose:
-        print("Working on ", filename)
+def fxtran_process_file(filename):
+    file = None
     try:
         file = pyfxtran.run(
             filename,
@@ -91,14 +80,18 @@ def analyze_file(filename, nodes, to_excludes, verbose):
         print(
             f"Error when processing {filename} with fxtran, this file will be ignored"
         )
-        return
+    return file
 
+
+def analyze_file(filename, nodes, to_excludes, verbose):
+    if verbose:
+        print("Working on ", filename)
+
+    file = fxtran_process_file(filename)
     src = file.replace('xmlns="http://fxtran.net/#syntax"', "")
     procs = get_procs(src)
 
     for proc in procs:
-        # proc=remove_contained(proc)
-        # print(ET.tostring(proc))
         proc_name = ""
 
         sub = proc.find(f"./subroutine-stmt/subroutine-N/N/n")
