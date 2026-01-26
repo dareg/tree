@@ -12,11 +12,13 @@ from pathlib import Path
 import subprocess
 from collections import Counter
 
+verbose = False
+
 
 class Node:
     def __init__(self, name, filename=None):
         self.name = name
-        self.drhack = False
+        self.drhook = False
         self.callees = set()
         self.filename = [filename]
 
@@ -83,9 +85,10 @@ def fxtran_process_file(filename):
     return file
 
 
-def analyze_file(filename, nodes, to_excludes, verbose):
+def analyze_file(filename, nodes, to_excludes):
     if verbose:
         print("Working on ", filename)
+        print("[as verbose")
 
     file = fxtran_process_file(filename)
     src = file.replace('xmlns="http://fxtran.net/#syntax"', "")
@@ -141,7 +144,7 @@ def generate_dotfile(nodes):
         for filename in nodes[node].filename:
             label += "\\n" + filename.name
 
-        if nodes[node].drhack:
+        if nodes[node].drhook:
             node_color = ', style=filled, fillcolor="#f7c93d"'
 
         g = g + f'{node}[label="{label}"{node_color}];\n'
@@ -163,7 +166,7 @@ def generate_sqlite(nodes):
     CREATE TABLE IF NOT EXISTS Proc (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        drhack INTEGER NOT NULL,
+        drhook INTEGER NOT NULL,
         CONSTRAINT unq UNIQUE(name)
     )
     """
@@ -185,13 +188,13 @@ def generate_sqlite(nodes):
     for node in nodes:
         label = node
         cursor.execute(
-            """INSERT INTO Proc (name, drhack) VALUES (?,?)""",
-            (node, nodes[node].drhack),
+            """INSERT INTO Proc (name, drhook) VALUES (?,?)""",
+            (node, nodes[node].drhook),
         )
     for node in nodes:
         for callee in nodes[node].callees:
             cursor.execute(
-                """INSERT INTO Proc (name, drhack) VALUES (?,?) ON CONFLICT DO NOTHING""",
+                """INSERT INTO Proc (name, drhook) VALUES (?,?) ON CONFLICT DO NOTHING""",
                 (callee, 0),
             )
 
@@ -224,16 +227,16 @@ def generate_sqlite(nodes):
     conn.close()
 
 
-def work_on_dir(dirname, to_excludes, verbose):
+def work_on_dir(dirname, to_excludes):
     root = Path(dirname)
     nodes = {}
     for filename in root.glob("**/*.F90"):
-        analyze_file(filename, nodes, to_excludes, verbose)
+        analyze_file(filename, nodes, to_excludes)
 
     return nodes
 
 
-def work_on_pack(dirname, to_excludes, verbose):
+def work_on_pack(dirname, to_excludes):
     root = Path(dirname)
     main = set()
     local = set()
@@ -251,7 +254,7 @@ def work_on_pack(dirname, to_excludes, verbose):
         filenames.append(Path(root) / Path("src/local/") / Path(filename))
 
     for filename in filenames:
-        analyze_file(filename, nodes, to_excludes, verbose)
+        analyze_file(filename, nodes, to_excludes)
 
     return nodes
 
@@ -293,7 +296,7 @@ def keep_known(nodes):
     return nodes
 
 
-def stats(nodes, drhack_path):
+def stats(nodes, drhook_path):
     called = {}
     for node in nodes:
         for callee in nodes[node].callees:
@@ -306,56 +309,60 @@ def stats(nodes, drhack_path):
     for i in range(min(3, len(most_common))):
         print(f"{most_common[i][0]} is called {most_common[i][1]} times")
 
-    if drhack_path:
-        drhack = 0
+    if drhook_path:
+        drhook = 0
         for node in nodes:
-            if nodes[node].drhack:
-                drhack += 1
-        print(drhack, "subroutines has been seen in the drhack.txt file")
+            if nodes[node].drhook:
+                drhook += 1
+        print(drhook, "subroutines has been seen in the drhook.txt file")
 
-        only_drhack = 0
-        for sub in read_drhack(drhack_path):
+        only_drhook = 0
+        for sub in read_drhook(drhook_path):
             if sub not in nodes:
-                only_drhack += 1
+                only_drhook += 1
         print(
-            only_drhack,
-            "subroutines were in drhack.txt but not in analyzed source files",
+            only_drhook,
+            "subroutines were in drhook.txt but not in analyzed source files",
         )
-        print("Total number of routines in drhack:", drhack + only_drhack)
+        print("Total number of routines in drhook:", drhook + only_drhook)
 
 
-def read_drhack(path):
+def read_drhook(drhook_prof_dir):
     called = set()
-    with open(path, "r") as fh:
-        for line in fh:
-            line = line.replace("<", "")
-            line = line.replace(">", "")
-            line = line.replace("/", "")
-            line = line.strip()
+    all_drhook_prof = Path(drhook_prof_dir).glob("drhook.prof.*")
+    for drhook_prof in all_drhook_prof:
+        fh = open(drhook_prof, "r")
+        for line in fh.readlines()[16:]:
+            line = str(line.split()[-1])
+            line = line.split("@")[0]
+            line = line.replace("*", "")
+            line = line.upper()
             called.add(line)
+        if verbose:
+            print(f"Read {drhook_prof}, {len(called)} subroutines called")
     return called
 
 
-def mark_as_seen_in_drhack(nodes, called):
+def mark_as_seen_in_drhook(nodes, called):
     for node in nodes:
         if nodes[node].name in called:
-            nodes[node].drhack = True
+            nodes[node].drhook = True
 
 
-def remove_if_not_in_drhack_and_callees(nodes, called):
+def remove_if_not_in_drhook_and_callees(nodes, called):
     nodes2 = {}
     for node in nodes:
         if node in called:
-            nodes[node].drhack = True
+            nodes[node].drhook = True
             nodes2[node] = nodes[node]
     return nodes2
 
 
-def remove_if_not_in_drhack(nodes, called):
+def remove_if_not_in_drhook(nodes, called):
     nodes2 = {}
     for node in nodes:
         if node in called:
-            nodes[node].drhack = True
+            nodes[node].drhook = True
             nodes2[node] = nodes[node]
     for node in nodes2:
         callees = set()
@@ -432,16 +439,16 @@ def handle_cli_options():
         action="store_true",
     )
     parser.add_argument(
-        "--drhack",
-        help="Highlights the subroutines that are also in the drhack.txt file",
+        "--drhook",
+        help="Highlights the subroutines that are also in the drhook_prof.* files",
     )
     parser.add_argument(
-        "--drhackonly",
-        help="Show only the subroutines that are in the parsed codebase and in the drhack.txt file",
+        "--drhookonly",
+        help="Show only the subroutines that are in the parsed codebase and in the drhook_prof.* files",
     )
     parser.add_argument(
-        "--drhackcallees",
-        help="Show the subroutines that are in the parsed codebase and in the drhack.txt file and the callees of those subroutines",
+        "--drhookcallees",
+        help="Show the subroutines that are in the parsed codebase and in the drhook_prof.* files and the callees of those subroutines",
     )
     args = parser.parse_args()
     return args
@@ -451,13 +458,18 @@ def main():
     args = handle_cli_options()
     nodes = {}
     to_excludes = set()
+
+    if args.verbose:
+        global verbose
+        verbose = True
+
     if args.excludes:
         to_excludes = read_excludes_list(args.excludes)
 
     if args.directory:
-        nodes = work_on_dir(args.directory, to_excludes, args.verbose)
+        nodes = work_on_dir(args.directory, to_excludes)
     elif args.pack:
-        nodes = work_on_pack(args.pack, to_excludes, args.verbose)
+        nodes = work_on_pack(args.pack, to_excludes)
 
     if args.known:
         nodes = keep_known(nodes)
@@ -474,21 +486,21 @@ def main():
             )
             return
 
-    drhack_path = ""
-    if args.drhack:
-        drhack_path = args.drhack
-        called = read_drhack(drhack_path)
-        mark_as_seen_in_drhack(nodes, called)
+    drhook_path = ""
+    if args.drhook:
+        drhook_path = args.drhook
+        called = read_drhook(drhook_path)
+        mark_as_seen_in_drhook(nodes, called)
 
-    if args.drhackcallees:
-        drhack_path = args.drhackcallees
-        called = read_drhack(drhack_path)
-        nodes = remove_if_not_in_drhack_and_callees(nodes, called)
+    if args.drhookcallees:
+        drhook_path = args.drhookcallees
+        called = read_drhook(drhook_path)
+        nodes = remove_if_not_in_drhook_and_callees(nodes, called)
 
-    if args.drhackonly:
-        drhack_path = args.drhackonly
-        called = read_drhack(drhack_path)
-        nodes = remove_if_not_in_drhack(nodes, called)
+    if args.drhookonly:
+        drhook_path = args.drhookonly
+        called = read_drhook(drhook_path)
+        nodes = remove_if_not_in_drhook(nodes, called)
 
     if args.dot:
         generate_dotfile(nodes)
@@ -496,7 +508,7 @@ def main():
         generate_sqlite(nodes)
 
     if args.stats:
-        stats(nodes, drhack_path)
+        stats(nodes, drhook_path)
 
 
 main()
