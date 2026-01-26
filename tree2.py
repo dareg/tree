@@ -293,7 +293,7 @@ def keep_known(nodes):
     return nodes
 
 
-def stats(nodes, path):
+def stats(nodes, drhack_path):
     called = {}
     for node in nodes:
         for callee in nodes[node].callees:
@@ -306,21 +306,22 @@ def stats(nodes, path):
     for i in range(min(3, len(most_common))):
         print(f"{most_common[i][0]} is called {most_common[i][1]} times")
 
-    drhack = 0
-    for node in nodes:
-        if nodes[node].drhack:
-            drhack += 1
-    print(drhack, "subroutines has been seen in the drhack.txt file")
+    if drhack_path:
+        drhack = 0
+        for node in nodes:
+            if nodes[node].drhack:
+                drhack += 1
+        print(drhack, "subroutines has been seen in the drhack.txt file")
 
-    if path:
         only_drhack = 0
-        for sub in read_drhack(path):
+        for sub in read_drhack(drhack_path):
             if sub not in nodes:
                 only_drhack += 1
         print(
             only_drhack,
             "subroutines were in drhack.txt but not in analyzed source files",
         )
+        print("Total number of routines in drhack:", drhack + only_drhack)
 
 
 def read_drhack(path):
@@ -335,15 +336,13 @@ def read_drhack(path):
     return called
 
 
-def mark_as_seen_in_drhack(path, nodes):
-    called = read_drhack(path)
+def mark_as_seen_in_drhack(nodes, called):
     for node in nodes:
         if nodes[node].name in called:
             nodes[node].drhack = True
 
 
-def remove_if_not_in_drhack_and_callees(path, nodes):
-    called = read_drhack(path)
+def remove_if_not_in_drhack_and_callees(nodes, called):
     nodes2 = {}
     for node in nodes:
         if node in called:
@@ -352,8 +351,7 @@ def remove_if_not_in_drhack_and_callees(path, nodes):
     return nodes2
 
 
-def remove_if_not_in_drhack(path, nodes):
-    called = read_drhack(path)
+def remove_if_not_in_drhack(nodes, called):
     nodes2 = {}
     for node in nodes:
         if node in called:
@@ -476,14 +474,21 @@ def main():
             )
             return
 
+    drhack_path = ""
     if args.drhack:
-        mark_as_seen_in_drhack(args.drhack, nodes)
+        drhack_path = args.drhack
+        called = read_drhack(drhack_path)
+        mark_as_seen_in_drhack(nodes, called)
 
     if args.drhackcallees:
-        nodes = remove_if_not_in_drhack_and_callees(args.drhackcallees, nodes)
+        drhack_path = args.drhackcallees
+        called = read_drhack(drhack_path)
+        nodes = remove_if_not_in_drhack_and_callees(nodes, called)
 
     if args.drhackonly:
-        nodes = remove_if_not_in_drhack(args.drhackonly, nodes)
+        drhack_path = args.drhackonly
+        called = read_drhack(drhack_path)
+        nodes = remove_if_not_in_drhack(nodes, called)
 
     if args.dot:
         generate_dotfile(nodes)
@@ -491,7 +496,7 @@ def main():
         generate_sqlite(nodes)
 
     if args.stats:
-        stats(nodes, args.drhack)
+        stats(nodes, drhack_path)
 
 
 main()
