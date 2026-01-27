@@ -339,10 +339,20 @@ def read_drhook(drhook_prof_dir):
     for drhook_prof in all_drhook_prof:
         fh = open(drhook_prof, "r")
         for line in fh.readlines()[16:]:
+            # Extract the last column
             line = str(line.split()[-1])
+
+            # Sometimes there is the name of the module in front of the sub name
+            line = line.split(":")[-1]
+
+            # Remove the thread number
             line = line.split("@")[0]
+
+            # final cleaning
             line = line.replace("*", "")
+            line = line.replace('"', "")
             line = line.upper()
+
             called.add(line)
         if verbose:
             print(f"Read {drhook_prof}, {len(called)} subroutines called")
