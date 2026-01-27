@@ -136,7 +136,7 @@ def analyze_file(filename, nodes, to_excludes):
         nodes[proc_name] = node
 
 
-def generate_dotfile(nodes):
+def generate_dotfile(nodes, dotfile):
     g = "digraph G{\n\tnode [shape=box, style=filled];\n"
     for node in nodes:
         node_color = ""
@@ -151,7 +151,7 @@ def generate_dotfile(nodes):
         for callee in nodes[node].callees:
             g = g + f"{node} -> {callee};\n"
     g = g + "}\n"
-    fh = open("g.dot", "w")
+    fh = open(dotfile, "w")
     fh.write(g)
 
 
@@ -424,7 +424,9 @@ to prof.
         metavar="SUBROUTINE_NAME",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("--dot", action="store_true")
+    parser.add_argument(
+        "--dot", help="Name of the generated dotfile", metavar="FILE", default="g.dot"
+    )
     parser.add_argument("--db", action="store_true")
     parser.add_argument(
         "-s",
@@ -518,7 +520,7 @@ def main():
         nodes = remove_if_not_in_drhook(nodes, called)
 
     if args.dot:
-        generate_dotfile(nodes)
+        generate_dotfile(nodes, args.dot)
     if args.db:
         generate_sqlite(nodes)
 
