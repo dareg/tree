@@ -11,6 +11,7 @@ import pyfxtran
 from pathlib import Path
 import subprocess
 from collections import Counter
+import tempfile
 
 verbose = False
 
@@ -88,7 +89,6 @@ def fxtran_process_file(filename):
 def analyze_file(filename, nodes, to_excludes):
     if verbose:
         print("Working on ", filename)
-        print("[as verbose")
 
     file = fxtran_process_file(filename)
     src = file.replace('xmlns="http://fxtran.net/#syntax"', "")
@@ -314,17 +314,23 @@ def stats(nodes, drhook_path):
         for node in nodes:
             if nodes[node].drhook:
                 drhook += 1
-        print(drhook, "subroutines has been seen in the drhook.txt file")
+        print(drhook, "subroutines has been seen in the drhook.prof.* files")
 
-        only_drhook = 0
+        only_drhook = set()
         for sub in read_drhook(drhook_path):
             if sub not in nodes:
-                only_drhook += 1
+                only_drhook.add(sub)
         print(
-            only_drhook,
-            "subroutines were in drhook.txt but not in analyzed source files",
+            len(only_drhook),
+            "subroutines were in drhook.prof.* but not in analyzed source files",
         )
-        print("Total number of routines in drhook:", drhook + only_drhook)
+        if len(only_drhook) > 0:
+            fh = tempfile.NamedTemporaryFile(delete=False, mode="w")
+            for sub in only_drhook:
+                fh.write(f"{sub}\n")
+            print(f"List saved in {fh.name}")
+
+        print("Total number of routines in drhook:", drhook + len(only_drhook))
 
 
 def read_drhook(drhook_prof_dir):
