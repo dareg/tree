@@ -415,12 +415,13 @@ to prof.
         """
         ),
     )
-    parser.add_argument("-p", "--pack")
+    parser.add_argument("-p", "--pack", metavar="PACK_DIRECTORY")
     parser.add_argument("-d", "--directory")
     parser.add_argument(
         "-f",
         "--cutfrom",
         help="Only shows subroutines called from this subroutine or one of its callee",
+        metavar="SUBROUTINE_NAME",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--dot", action="store_true")
@@ -435,11 +436,12 @@ to prof.
         "-e",
         "--excludes",
         help="File containing on each line a subroutine's name to exclude from the graph",
+        metavar="FILE",
     )
     parser.add_argument(
         "-k",
         "--known",
-        help="Only show the calls to subroutines that are known",
+        help="Only show the calls to subroutines that are known from the parsed code",
         action="store_true",
     )
     parser.add_argument(
@@ -451,14 +453,17 @@ to prof.
     group.add_argument(
         "--drhook",
         help="Highlights the subroutines that are also in the drhook_prof.* files",
+        metavar="DIRECTORY",
     )
     group.add_argument(
         "--drhookonly",
         help="Show only the subroutines that are in the parsed codebase and in the drhook_prof.* files",
+        metavar="DIRECTORY",
     )
     group.add_argument(
         "--drhookcallees",
         help="Show the subroutines that are in the parsed codebase and in the drhook_prof.* files and the callees of those subroutines",
+        metavar="DIRECTORY",
     )
     args = parser.parse_args()
     return args
