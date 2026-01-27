@@ -399,10 +399,19 @@ def handle_cli_options():
     parser = argparse.ArgumentParser(
         prog="tree",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=textwrap.dedent(
+        description=textwrap.dedent(
             """\
-        One can use the dot command to generate an image from the generated dotfile:
-            dot -Ksfdp -Goverlap=scale -Tpng -o g.png g.dot
+Generate a call tree in a dot file from a pack or a directory containing
+Fortran code. Once the dot file is generated, one can use the dot command
+to generate an image, a pdf and so on:
+    dot -Tpdf -o g.pdf g.dot
+
+The drhook options take a directory in argument. This directory must contains
+all the dr_hook.prof.* files generated during the run. To generate those files
+the environment variable DR_HOOK must be set to 1 and DR_HOOK_OPT must be set
+to prof.
+    export DR_HOOK=1
+    export DR_HOOK_OPT=prof
         """
         ),
     )
@@ -425,7 +434,7 @@ def handle_cli_options():
     parser.add_argument(
         "-e",
         "--excludes",
-        help="File containing on each line a subroutine name to exclude from the graph",
+        help="File containing on each line a subroutine's name to exclude from the graph",
     )
     parser.add_argument(
         "-k",
@@ -438,15 +447,16 @@ def handle_cli_options():
         help="Remove the procedures that are neither called nor calling something",
         action="store_true",
     )
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--drhook",
         help="Highlights the subroutines that are also in the drhook_prof.* files",
     )
-    parser.add_argument(
+    group.add_argument(
         "--drhookonly",
         help="Show only the subroutines that are in the parsed codebase and in the drhook_prof.* files",
     )
-    parser.add_argument(
+    group.add_argument(
         "--drhookcallees",
         help="Show the subroutines that are in the parsed codebase and in the drhook_prof.* files and the callees of those subroutines",
     )
