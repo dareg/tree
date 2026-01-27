@@ -22,6 +22,7 @@ class Node:
         self.drhook = False
         self.callees = set()
         self.filename = [filename]
+        self.hide = False
 
     def add_callee(self, callee):
         self.callees.add(callee)
@@ -31,6 +32,22 @@ class Node:
 
     def is_calling(self, callee):
         return callee in self.callees
+
+    def __str__(self):
+        s = f"{self.name}"
+        for filename in self.filename:
+            s += f" {filename}"
+        s += f"\n\tDR_HOOK:{self.drhook}, hide:{self.hide}\n"
+        if self.callees:
+            s += "\t"
+        s += ", ".join([callee for callee in self.callees])
+        return s
+
+
+def print_nodes(file, nodes):
+    fh = open(file, "w")
+    for node in nodes:
+        print(nodes[node], file=fh)
 
 
 ns = "{http://fxtran.net/#syntax}"
@@ -137,19 +154,32 @@ def analyze_file(filename, nodes, to_excludes):
 
 
 def generate_dotfile(nodes, dotfile):
-    g = "digraph G{\n\tnode [shape=box, style=filled];\n"
-    for node in nodes:
-        node_color = ""
+    def build_label(node):
         label = node
         for filename in nodes[node].filename:
             label += "\\n" + filename.name
+        return label
 
+    g = "digraph G{\n\tnode [shape=box, style=filled];\n"
+    for node in nodes:
+        if nodes[node].hide:
+            continue
+
+        node_color = ""
+        label = build_label(node)
         if nodes[node].drhook:
-            node_color = ', style=filled, fillcolor="#f7c93d"'
+            node_color = 'fillcolor="#f7c93d"'
 
         g = g + f'{node}[label="{label}"{node_color}];\n'
         for callee in nodes[node].callees:
             g = g + f"{node} -> {callee};\n"
+
+            # If the nodes is marked hidden but we are still pointing to it,
+            # then we can also add the source file
+            if callee in nodes and nodes[callee].hide:
+                label = build_label(callee)
+                g = g + f'{callee}[label="{label}"];\n'
+
     g = g + "}\n"
     fh = open(dotfile, "w")
     fh.write(g)
@@ -366,27 +396,26 @@ def mark_as_seen_in_drhook(nodes, called):
 
 
 def remove_if_not_in_drhook_and_callees(nodes, called):
-    nodes2 = {}
     for node in nodes:
         if node in called:
             nodes[node].drhook = True
-            nodes2[node] = nodes[node]
-    return nodes2
+        else:
+            nodes[node].hide = True
 
 
 def remove_if_not_in_drhook(nodes, called):
-    nodes2 = {}
     for node in nodes:
         if node in called:
             nodes[node].drhook = True
-            nodes2[node] = nodes[node]
-    for node in nodes2:
+        else:
+            nodes[node].hide = True
+
+    for node in nodes:
         callees = set()
-        for call in nodes2[node].callees:
-            if call in nodes2:
+        for call in nodes[node].callees:
+            if not nodes[call].hide:
                 callees.add(call)
-        nodes2[node].callees = callees
-    return nodes2
+        nodes[node].callees = callees
 
 
 def nounused(nodes):
@@ -511,7 +540,19 @@ def main():
         nodes = nounused(nodes)
 
     if args.cutfrom:
+        fh = open("avant", "w")
+        for node in nodes:
+            print(node, file=fh)
+            for c in nodes[node].callees:
+                print(f"\t{c}", file=fh)
+
         nodes = cut_before(args.cutfrom, nodes)
+
+        fh = open("apres", "w")
+        for node in nodes:
+            print(node, file=fh)
+            for c in nodes[node].callees:
+                print(f"\t{c}", file=fh)
         if not nodes:
             print(
                 f"Couldn't find subroutine {args.cutfrom} in the analyzed files",
@@ -528,12 +569,12 @@ def main():
     if args.drhookcallees:
         drhook_path = args.drhookcallees
         called = read_drhook(drhook_path)
-        nodes = remove_if_not_in_drhook_and_callees(nodes, called)
+        remove_if_not_in_drhook_and_callees(nodes, called)
 
     if args.drhookonly:
         drhook_path = args.drhookonly
         called = read_drhook(drhook_path)
-        nodes = remove_if_not_in_drhook(nodes, called)
+        remove_if_not_in_drhook(nodes, called)
 
     if args.dot:
         generate_dotfile(nodes, args.dot)
