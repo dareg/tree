@@ -7,11 +7,12 @@ import argparse
 import textwrap
 import xml.etree.ElementTree as ET
 import sys
-import pyfxtran
 from pathlib import Path
 import subprocess
 from collections import Counter
 import tempfile
+import shutil
+import subprocess
 
 verbose = False
 
@@ -90,17 +91,24 @@ def remove_contained(proc):
 
 
 def fxtran_process_file(filename):
-    file = None
-    try:
-        file = pyfxtran.run(
+    res = subprocess.run(
+        [
+            "fxtran",
             filename,
-            ["-construct-tag", "-no-include", "-line-length", "9999", "-o", "-"],
-        )
-    except subprocess.CalledProcessError:
-        print(
-            f"Error when processing {filename} with fxtran, this file will be ignored"
-        )
-    return file
+            "-construct-tag",
+            "-no-include",
+            "-line-length",
+            "9999",
+            "-o",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode != 0:
+        sys.exit(f"Error when parsing {filename} with fxtran")
+
+    return res.stdout
 
 
 def get_proc_name(proc):
@@ -123,9 +131,9 @@ def analyze_file(filename, nodes, to_excludes):
     if verbose:
         print("Working on ", filename)
 
-    file = fxtran_process_file(filename)
-    src = file.replace('xmlns="http://fxtran.net/#syntax"', "")
-    procs = get_procs(src)
+    xml = fxtran_process_file(filename)
+    xml = xml.replace('xmlns="http://fxtran.net/#syntax"', "")
+    procs = get_procs(xml)
 
     for proc in procs:
 
@@ -526,9 +534,15 @@ to prof.
 
 
 def main():
+    if sys.version_info < (3, 10):
+        sys.exit("Python is too old, at least python 3.10 is required")
+
     args = handle_cli_options()
     nodes = {}
     to_excludes = set()
+
+    if not shutil.which("fxtran"):
+        sys.exit("The fxtran command needs to be in the PATH")
 
     if args.verbose:
         global verbose
