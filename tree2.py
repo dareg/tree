@@ -2,17 +2,16 @@
 
 # Judicaël Grasset - Metéo-France 2025-2026
 
-import sqlite3
+from collections import Counter
+from pathlib import Path
 import argparse
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
 import textwrap
 import xml.etree.ElementTree as ET
-import sys
-from pathlib import Path
-import subprocess
-from collections import Counter
-import tempfile
-import shutil
-import subprocess
 
 verbose = False
 
@@ -112,15 +111,15 @@ def fxtran_process_file(filename):
 
 
 def get_proc_name(proc):
-    sub = proc.find(f"./subroutine-stmt/subroutine-N/N/n")
+    sub = proc.find("./subroutine-stmt/subroutine-N/N/n")
     if sub is not None:
         return sub.text.upper()
 
-    func = proc.find(f"./function-stmt/function-N/N/n")
+    func = proc.find("./function-stmt/function-N/N/n")
     if func is not None:
         return func.text.upper()
 
-    prog = proc.find(f"./program-stmt/program-N/N/n")
+    prog = proc.find("./program-stmt/program-N/N/n")
     if prog is not None:
         return prog.text.upper()
 
@@ -233,7 +232,6 @@ def generate_sqlite(nodes):
 
     # insert all procedures
     for node in nodes:
-        label = node
         cursor.execute(
             """INSERT INTO Proc (name, drhook) VALUES (?,?)""",
             (node, nodes[node].drhook),
@@ -563,25 +561,9 @@ def main():
         nodes = nounused(nodes)
 
     if args.cutfrom:
-        fh = open("avant", "w")
-        for node in nodes:
-            print(node, file=fh)
-            for c in nodes[node].callees:
-                print(f"\t{c}", file=fh)
-
         nodes = cut_before(args.cutfrom, nodes)
-
-        fh = open("apres", "w")
-        for node in nodes:
-            print(node, file=fh)
-            for c in nodes[node].callees:
-                print(f"\t{c}", file=fh)
         if not nodes:
-            print(
-                f"Couldn't find subroutine {args.cutfrom} in the analyzed files",
-                file=sys.stderr,
-            )
-            return
+            sys.exit("Couldn't find subroutine {args.cutfrom} in the analyzed files")
 
     drhook_path = ""
     if args.drhook:
