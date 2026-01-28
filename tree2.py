@@ -103,6 +103,22 @@ def fxtran_process_file(filename):
     return file
 
 
+def get_proc_name(proc):
+    sub = proc.find(f"./subroutine-stmt/subroutine-N/N/n")
+    if sub is not None:
+        return sub.text.upper()
+
+    func = proc.find(f"./function-stmt/function-N/N/n")
+    if func is not None:
+        return func.text.upper()
+
+    prog = proc.find(f"./program-stmt/program-N/N/n")
+    if prog is not None:
+        return prog.text.upper()
+
+    return None
+
+
 def analyze_file(filename, nodes, to_excludes):
     if verbose:
         print("Working on ", filename)
@@ -112,23 +128,10 @@ def analyze_file(filename, nodes, to_excludes):
     procs = get_procs(src)
 
     for proc in procs:
-        proc_name = ""
 
-        sub = proc.find(f"./subroutine-stmt/subroutine-N/N/n")
-        if sub is not None:
-            proc_name = sub.text
-
-        func = proc.find(f"./function-stmt/function-N/N/n")
-        if func is not None:
-            proc_name = func.text
-
-        prog = proc.find(f"./program-stmt/program-N/N/n")
-        if prog is not None:
-            proc_name = prog.text
-
+        proc_name = get_proc_name(proc)
         if not proc_name:
             continue
-        proc_name = proc_name.upper()
 
         if proc_name in to_excludes:
             continue
@@ -142,13 +145,19 @@ def analyze_file(filename, nodes, to_excludes):
 
         calls = proc.findall(".//call-stmt")
         for call in calls:
+            callee_name = None
             # the 'cpp' node might be added by a macro between 'N' and 'n' (see call abor1 in bator_pool_balance_mod.F90)
-            callee = call.find(".//procedure-designator/named-E/N//n").text
-            callee = callee.upper()
-            if callee in to_excludes:
+            callee_name = call.find(".//procedure-designator/named-E/N//n").text.upper()
+
+            # sometimes the procedure is member of a type, the name is then not in the <n> tag but in the last <cat> tag of the call
+            ct = call.findall(".//procedure-designator//ct")
+            if ct:
+                callee_name = ct[-1].text.upper()
+
+            if callee_name in to_excludes:
                 continue
 
-            node.add_callee(callee)
+            node.add_callee(callee_name)
 
         nodes[proc_name] = node
 
