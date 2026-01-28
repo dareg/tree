@@ -422,7 +422,7 @@ def remove_if_not_in_drhook(nodes, called):
     for node in nodes:
         callees = set()
         for call in nodes[node].callees:
-            if not nodes[call].hide:
+            if call in nodes and not nodes[call].hide:
                 callees.add(call)
         nodes[node].callees = callees
 
