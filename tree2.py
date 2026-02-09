@@ -172,11 +172,11 @@ def analyze_file(filename, nodes, to_excludes):
 def generate_dotfile(nodes, dotfile):
     def build_label(node):
         label = node
-        for filename in nodes[node].filename:
+        for filename in sorted(nodes[node].filename):
             label += "\\n" + filename.name
         return label
 
-    g = "digraph G{\n\tnode [shape=box, style=filled];\n"
+    lines = []
     for node in nodes:
         if nodes[node].hide:
             continue
@@ -186,19 +186,22 @@ def generate_dotfile(nodes, dotfile):
         if nodes[node].drhook:
             node_color = 'fillcolor="#f7c93d"'
 
-        g = g + f'{node}[label="{label}"{node_color}];\n'
+        lines.append(f'{node}[label="{label}"{node_color}];\n')
         for callee in nodes[node].callees:
-            g = g + f"{node} -> {callee};\n"
+            lines.append(f"{node} -> {callee};\n")
 
             # If the nodes is marked hidden but we are still pointing to it,
             # then we can also add the source file
             if callee in nodes and nodes[callee].hide:
                 label = build_label(callee)
-                g = g + f'{callee}[label="{label}"];\n'
+                line.append(f'{callee}[label="{label}"];\n')
 
-    g = g + "}\n"
+    lines = sorted(lines)
     fh = open(dotfile, "w")
-    fh.write(g)
+    fh.write("digraph G{\n")
+    fh.write("node [shape=box, style=filled];\n")
+    fh.writelines(lines)
+    fh.write("}\n")
 
 
 def generate_sqlite(nodes):
