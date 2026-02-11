@@ -16,11 +16,47 @@ import xml.etree.ElementTree as ET
 verbose = False
 
 
+class Procedure:
+    def __init__(self, name, alias):
+        self.name = name
+        self.alias = alias
+
+    def __str__(self):
+        return f"{self.alias} => {self.name}"
+
+
+class DerivedType:
+    def __init__(self, name, filename):
+        self.name = name
+        self.filename = filename
+        self.procedures = []
+        self.members = {}
+
+    def add_member(self, name, typename):
+        self.members[typename] = name
+
+    def add_procedure(self, name, alias):
+        self.procedures.append(Procedure(name, alias))
+
+    def __str__(self):
+        return f"{self.filename}\nType:{self.name}\n\tProc:{', '.join([str(x) for x in self.procedures])}\n\tSubtype:{self.members}"
+
+
+derived_types = {}
+
+
+class MethodCall:
+    def __init__(self, t):
+        self.type = t
+        self.cts = []
+
+
 class Node:
     def __init__(self, name, filename=None):
         self.name = name
         self.drhook = False
         self.callees = set()
+        self.method_callees = []
         self.filename = [filename]
         self.hide = False
 
@@ -42,6 +78,38 @@ class Node:
             s += "\t"
         s += ", ".join([callee for callee in self.callees])
         return s
+
+
+def get_derived_type_var(proc):
+    variables = {}
+    decls = proc.findall("./T-decl-stmt")
+    for decl in decls:
+        derived_type = decl.find(".//derived-T-spec/T-N/N/n")
+        if derived_type is None:
+            continue
+        derived_type = derived_type.text.upper()
+
+        for varname in decl.findall(".//EN-decl/EN-N/N/n"):
+            varname = varname.text.upper()
+            variables[varname] = derived_type
+    return variables
+
+
+def get_derived_type_procedures(nodes, filename):
+    dt_nodes = nodes.findall(".//T-construct")
+    for dt_node in dt_nodes:
+        if dt_node.find(".//contains-stmt") is None:
+            continue
+        typename = dt_node.find(".//T-stmt/T-N/N/n").text.upper()
+        dt = DerivedType(typename, filename)
+
+        contained_procs = dt_node.findall(".//procedure-stmt/")
+        for contained_proc in contained_procs:
+            alias = contained_proc.find("./rename/use-N/n").text.upper()
+            name = contained_proc.find("./rename/N/n").text.upper()
+            dt.add_procedure(name, alias)
+
+        derived_types[typename] = dt
 
 
 def print_nodes(file, nodes):
@@ -133,6 +201,9 @@ def analyze_file(filename, nodes, to_excludes):
     xml = fxtran_process_file(filename)
     xml = xml.replace('xmlns="http://fxtran.net/#syntax"', "")
     procs = get_procs(xml)
+    get_derived_type_procedures(ET.fromstring(xml), filename)
+    for dt in derived_types:
+        print(dt)
 
     for proc in procs:
 
@@ -142,6 +213,8 @@ def analyze_file(filename, nodes, to_excludes):
 
         if proc_name in to_excludes:
             continue
+
+        varnames = get_derived_type_var(proc)
 
         node = None
         if proc_name in nodes:
@@ -157,14 +230,17 @@ def analyze_file(filename, nodes, to_excludes):
             callee_name = call.find(".//procedure-designator/named-E/N//n").text.upper()
 
             # sometimes the procedure is member of a type, the name is then not in the <n> tag but in the last <cat> tag of the call
-            ct = call.findall(".//procedure-designator//ct")
-            if ct:
-                callee_name = ct[-1].text.upper()
+            ct_nodes = call.findall(".//procedure-designator//ct")
 
-            if callee_name in to_excludes:
-                continue
-
-            node.add_callee(callee_name)
+            if ct_nodes:
+                mc = MethodCall(varnames[callee_name])
+                for ct in ct_nodes:
+                    mc.cts.append(ct.text.upper())
+                node.method_callees.append(mc)
+            else:
+                if callee_name in to_excludes:
+                    continue
+                node.add_callee(callee_name)
 
         nodes[proc_name] = node
 
@@ -275,11 +351,27 @@ def generate_sqlite(nodes):
     conn.close()
 
 
+def solve_method_calls(nodes):
+    for node in nodes:
+        for method_call in nodes[node].method_callees:
+            if method_call.type not in derived_types:
+                nodes[node].add_callee(modethod_call.cts[-1])
+                continue
+            type_procs = derived_types[method_call.type]
+            for proc in type_procs.procedures:
+                if proc.alias == method_call.cts[0]:
+                    nodes[node].add_callee(proc.name)
+
+
 def work_on_dir(dirname, to_excludes):
     root = Path(dirname)
     nodes = {}
     for filename in root.glob("**/*.F90"):
         analyze_file(filename, nodes, to_excludes)
+        for node in nodes:
+            print(type(node), node)
+
+    solve_method_calls(nodes)
 
     return nodes
 
