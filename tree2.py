@@ -54,6 +54,7 @@ class MethodCall:
 class Node:
     def __init__(self, name, filename=None):
         self.name = name
+        self.alias = ""
         self.drhook = False
         self.callees = set()
         self.method_callees = []
@@ -71,6 +72,8 @@ class Node:
 
     def __str__(self):
         s = f"{self.name}"
+        if self.alias:
+            s += f" (aliased as {self.alias})"
         for filename in self.filename:
             s += f" {filename}"
         s += f"\n\tDR_HOOK:{self.drhook}, hide:{self.hide}\n"
@@ -95,8 +98,9 @@ def get_derived_type_var(proc):
     return variables
 
 
-def get_derived_type_procedures(nodes, filename):
+def update_derived_type_procedures(nodes, filename):
     dt_nodes = nodes.findall(".//T-construct")
+    local_aliases = {}
     for dt_node in dt_nodes:
         if dt_node.find(".//contains-stmt") is None:
             continue
@@ -108,8 +112,10 @@ def get_derived_type_procedures(nodes, filename):
             alias = contained_proc.find("./rename/use-N/n").text.upper()
             name = contained_proc.find("./rename/N/n").text.upper()
             dt.add_procedure(name, alias)
+            local_aliases[name] = alias
 
         derived_types[typename] = dt
+    return local_aliases
 
 
 def print_nodes(file, nodes):
@@ -201,9 +207,7 @@ def analyze_file(filename, nodes, to_excludes):
     xml = fxtran_process_file(filename)
     xml = xml.replace('xmlns="http://fxtran.net/#syntax"', "")
     procs = get_procs(xml)
-    get_derived_type_procedures(ET.fromstring(xml), filename)
-    for dt in derived_types:
-        print(dt)
+    local_aliases = update_derived_type_procedures(ET.fromstring(xml), filename)
 
     for proc in procs:
 
@@ -222,6 +226,9 @@ def analyze_file(filename, nodes, to_excludes):
             node.add_filename(filename)
         else:
             node = Node(proc_name, filename)
+
+        if node.name in local_aliases:
+            node.alias = local_aliases[node.name]
 
         calls = proc.findall(".//call-stmt")
         for call in calls:
@@ -248,6 +255,9 @@ def analyze_file(filename, nodes, to_excludes):
 def generate_dotfile(nodes, dotfile):
     def build_label(node):
         label = node
+
+        if nodes[node].alias:
+            label += f" (aliased as {nodes[node].alias})"
         for filename in sorted(nodes[node].filename):
             label += "\\n" + filename.name
         return label
@@ -368,8 +378,6 @@ def work_on_dir(dirname, to_excludes):
     nodes = {}
     for filename in root.glob("**/*.F90"):
         analyze_file(filename, nodes, to_excludes)
-        for node in nodes:
-            print(type(node), node)
 
     solve_method_calls(nodes)
 
