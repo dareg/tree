@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Judicaël Grasset - Metéo-France 2025-2026
+# Judicaël Grasset - Météo-France 2025-2026
 
 from collections import Counter
 from pathlib import Path
@@ -33,10 +33,15 @@ class DerivedType:
         self.members = {}
 
     def add_member(self, name, typename):
-        self.members[typename] = name
+        self.members[name] = typename
 
     def add_procedure(self, name, alias):
         self.procedures.append(Procedure(name, alias))
+
+    def get_member_type(self, member_name):
+        if member_name in self.members:
+            return self.members[member_name]
+        return None
 
     def __str__(self):
         return f"{self.filename}\nType:{self.name}\n\tProc:{', '.join([str(x) for x in self.procedures])}\n\tSubtype:{self.members}"
@@ -57,7 +62,7 @@ class Node:
         self.alias = ""
         self.drhook = False
         self.callees = set()
-        self.method_callees = []
+        self.callees_chains_to_solve = []
         self.filename = [filename]
         self.hide = False
 
@@ -83,7 +88,7 @@ class Node:
         return s
 
 
-def get_derived_type_var(proc):
+def get_local_vars_derived_types(proc):
     variables = {}
     decls = proc.findall("./T-decl-stmt")
     for decl in decls:
@@ -102,11 +107,21 @@ def update_derived_type_procedures(nodes, filename):
     dt_nodes = nodes.findall(".//T-construct")
     local_aliases = {}
     for dt_node in dt_nodes:
-        if dt_node.find(".//contains-stmt") is None:
-            continue
+        # if dt_node.find(".//contains-stmt") is None:
+        #    continue
         typename = dt_node.find(".//T-stmt/T-N/N/n").text.upper()
         dt = DerivedType(typename, filename)
 
+        # Store the derived subtypes
+        subtypes = dt_node.findall(".//component-decl-stmt")
+        for subtype in subtypes:
+            if subtype.find(".//derived-T-spec") is None:
+                continue
+            subtypename = subtype.find(".//derived-T-spec/T-N/N/n").text.upper()
+            varname = subtype.find(".//EN-decl-LT/EN-decl/EN-N/N/n").text.upper()
+            dt.add_member(varname, subtypename)
+
+        # Store the procedures contained in the type
         contained_procs = dt_node.findall(".//procedure-stmt/")
         for contained_proc in contained_procs:
             alias = contained_proc.find("./rename/use-N/n").text.upper()
@@ -218,7 +233,7 @@ def analyze_file(filename, nodes, to_excludes):
         if proc_name in to_excludes:
             continue
 
-        varnames = get_derived_type_var(proc)
+        local_vars_types = get_local_vars_derived_types(proc)
 
         node = None
         if proc_name in nodes:
@@ -240,10 +255,10 @@ def analyze_file(filename, nodes, to_excludes):
             ct_nodes = call.findall(".//procedure-designator//ct")
 
             if ct_nodes:
-                mc = MethodCall(varnames[callee_name])
+                mc = MethodCall(local_vars_types[callee_name])
                 for ct in ct_nodes:
                     mc.cts.append(ct.text.upper())
-                node.method_callees.append(mc)
+                node.callees_chains_to_solve.append(mc)
             else:
                 if callee_name in to_excludes:
                     continue
@@ -361,15 +376,25 @@ def generate_sqlite(nodes):
     conn.close()
 
 
+def solve_chain_of_members(cur_type, cts):
+    for ct in cts[:-1]:
+        if cur_type not in derived_types:
+            return None
+        cur_type = derived_types[cur_type].get_member_type(ct)
+    return cur_type
+
+
 def solve_method_calls(nodes):
     for node in nodes:
-        for method_call in nodes[node].method_callees:
-            if method_call.type not in derived_types:
-                nodes[node].add_callee(modethod_call.cts[-1])
+        for method_call in nodes[node].callees_chains_to_solve:
+            cur_type = solve_chain_of_members(method_call.type, method_call.cts)
+
+            if cur_type not in derived_types:
+                nodes[node].add_callee(method_call.cts[-1])
                 continue
-            type_procs = derived_types[method_call.type]
-            for proc in type_procs.procedures:
-                if proc.alias == method_call.cts[0]:
+
+            for proc in derived_types[cur_type].procedures:
+                if proc.alias == method_call.cts[-1]:
                     nodes[node].add_callee(proc.name)
 
 
