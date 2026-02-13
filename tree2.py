@@ -648,6 +648,8 @@ def main():
         nodes = work_on_dir(args.directory, to_excludes)
     elif args.pack:
         nodes = work_on_pack(args.pack, to_excludes)
+    else:
+        sys.exit("No pack or directory was specified")
 
     if args.known:
         nodes = keep_known(nodes)
