@@ -6,7 +6,6 @@ from collections import Counter
 from pathlib import Path
 import argparse
 import shutil
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -305,77 +304,6 @@ def generate_dotfile(nodes, dotfile):
     fh.write("}\n")
 
 
-def generate_sqlite(nodes):
-    conn = sqlite3.connect("g.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""DROP TABLE IF EXISTS Proc;""")
-    cursor.execute("""DROP TABLE IF EXISTS Call;""")
-    cursor.execute(
-        """
-    CREATE TABLE IF NOT EXISTS Proc (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        drhook INTEGER NOT NULL,
-        CONSTRAINT unq UNIQUE(name)
-    )
-    """
-    )
-    cursor.execute(
-        """
-    CREATE TABLE IF NOT EXISTS Call (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        caller INTEGER,
-        callee INTEGER,
-        FOREIGN KEY (caller) REFERENCES Proc(id),
-        FOREIGN KEY (callee) REFERENCES Proc(id)
-    )
-    """
-    )
-    conn.commit()
-
-    # insert all procedures
-    for node in nodes:
-        cursor.execute(
-            """INSERT INTO Proc (name, drhook) VALUES (?,?)""",
-            (node, nodes[node].drhook),
-        )
-    for node in nodes:
-        for callee in nodes[node].callees:
-            cursor.execute(
-                """INSERT INTO Proc (name, drhook) VALUES (?,?) ON CONFLICT DO NOTHING""",
-                (callee, 0),
-            )
-
-    # add all the calls
-    for node in nodes:
-        for callee in nodes[node].callees:
-            cursor.execute(
-                """SELECT id FROM Proc WHERE name = ? ORDER BY id DESC LIMIT 1""",
-                (node,),
-            )
-            caller_id = cursor.fetchone()[0]
-            cursor.execute(
-                """SELECT id FROM Proc WHERE name = ? ORDER BY id DESC LIMIT 1""",
-                (callee,),
-            )
-            res = cursor.fetchone()
-            if not res:
-                continue
-            callee_id = res[0]
-
-            cursor.execute(
-                """INSERT INTO Call (caller,callee) VALUES (?,?)""",
-                (
-                    caller_id,
-                    callee_id,
-                ),
-            )
-
-    conn.commit()
-    conn.close()
-
-
 def solve_chain_of_members(cur_type, cts):
     for ct in cts[:-1]:
         if cur_type not in derived_types:
@@ -615,7 +543,6 @@ to prof.
     parser.add_argument(
         "--dot", help="name of the generated dotfile", metavar="FILE", default="g.dot"
     )
-    parser.add_argument("--db", action="store_true")
     parser.add_argument(
         "-s",
         "--stats",
@@ -713,8 +640,6 @@ def main():
 
     if args.dot:
         generate_dotfile(nodes, args.dot)
-    if args.db:
-        generate_sqlite(nodes)
 
     if args.stats:
         stats(nodes, drhook_path)
