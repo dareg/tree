@@ -13,6 +13,8 @@ import textwrap
 import xml.etree.ElementTree as ET
 
 verbose = False
+ns = "{http://fxtran.net/#syntax}"
+derived_types = {}
 
 
 class Procedure:
@@ -44,9 +46,6 @@ class DerivedType:
 
     def __str__(self):
         return f"{self.filename}\nType:{self.name}\n\tProc:{', '.join([str(x) for x in self.procedures])}\n\tSubtype:{self.members}"
-
-
-derived_types = {}
 
 
 class MethodCall:
@@ -138,24 +137,6 @@ def print_nodes(file, nodes):
         print(nodes[node], file=fh)
 
 
-ns = "{http://fxtran.net/#syntax}"
-
-
-def simplify_xml(lines):
-    # remove namespace, add node containing subroutine
-    lines2 = []
-    for line in lines:
-        if "<sub><subroutine-stmt>" in line:
-            continue
-        if "</end-subroutine-stmt></sub>" in line:
-            continue
-        line = line.replace('xmlns="http://fxtran.net/#syntax"', "")
-        #        line=line.replace("<subroutine-stmt>","<sub><subroutine-stmt>")
-        #        line=line.replace("</end-subroutine-stmt>","</end-subroutine-stmt></sub>")
-        lines2.append(line)
-    return "".join(lines2)
-
-
 def get_procs(xml_file):
     root = ET.fromstring(xml_file)
 
@@ -169,12 +150,6 @@ def get_procs(xml_file):
     procs.extend(root.findall(".//program-unit[function-stmt]"))
     procs.extend(root.findall(".//program-unit[program-stmt]"))
     return procs
-
-
-def remove_contained(proc):
-    for elt in proc.findall(".//program-unit"):
-        proc.remove(elt)
-    return proc
 
 
 def fxtran_process_file(filename):
