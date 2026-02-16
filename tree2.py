@@ -86,9 +86,14 @@ class Node:
         return s
 
 
-def get_local_vars_derived_types(proc):
+def get_local_vars_derived_types(proc, everywhere=False):
     variables = {}
-    decls = proc.findall("./T-decl-stmt")
+    decls = None
+    if not everywhere:
+        decls = proc.findall("./T-decl-stmt")
+    else:
+        decls = proc.findall(".//T-decl-stmt")
+
     for decl in decls:
         derived_type = decl.find(".//derived-T-spec/T-N/N/n")
         if derived_type is None:
@@ -142,9 +147,7 @@ def print_nodes(file, nodes):
         print(nodes[node], file=fh)
 
 
-def get_procs(xml_file):
-    root = ET.fromstring(xml_file)
-
+def get_procs(root):
     # Remove nodes containing the interfaces (usually modi_* files)
     for parent in root.iter():
         children_to_remove = parent.findall("interface-construct")
@@ -194,14 +197,53 @@ def get_proc_name(proc):
     return None
 
 
+def remove_associate(procs):
+    for proc in procs:
+        associate_construct = proc.find(".//associate-construct[associate-stmt]")
+        if associate_construct is None:
+            continue
+        associates = associate_construct.findall(".//associate")
+        associates_ht = {}
+        for associate in associates:
+            alias = associate.find("./associate-N/n").text.upper()
+            real_name = associate.find("./selector/named-E/N/n").text.upper()
+            associates_ht[alias] = real_name
+
+        print(associates_ht)
+        for n in associate_construct.findall(".//N/n"):
+            if n.text in associates_ht:
+                n.text = associates_ht[n.text.upper()]
+
+        to_delete = associate_construct.find("./associate-stmt")
+        associate_construct.remove(to_delete)
+        to_delete = associate_construct.find("./end-associate-stmt")
+        associate_construct.remove(to_delete)
+
+        # parent = proc.find(".//associate-construct/..")
+        ##print(parent)
+        # inside_associate_construct = proc.findall(".//associate-construct/")
+        # for elt in parent:
+        #    ET.dump(elt)
+
+        # parent.remove(associate_construct)
+        # for elt in inside_associate_construct:
+        #    ET.dump(elt)
+        #    parent.extend(elt)
+
+        # ET.dump(proc)
+
+
 def analyze_file(filename, nodes, to_excludes):
     if verbose:
         print("Working on ", filename)
 
     xml = fxtran_process_file(filename)
     xml = xml.replace('xmlns="http://fxtran.net/#syntax"', "")
-    procs = get_procs(xml)
+    root = ET.fromstring(xml)
+    procs = get_procs(root)
+    remove_associate(procs)
     local_aliases = update_derived_type_procedures(ET.fromstring(xml), filename)
+    all_vars = get_local_vars_derived_types(root, everywhere=True)
 
     for proc in procs:
 
@@ -212,7 +254,10 @@ def analyze_file(filename, nodes, to_excludes):
         if proc_name in to_excludes:
             continue
 
-        local_vars_types = get_local_vars_derived_types(proc)
+        # Get all variables, put replace them by local variable if they exists
+        # By doing we get access to all the modules variables declared in the parents
+        local_vars_types = all_vars.copy()
+        local_vars_types |= get_local_vars_derived_types(proc)
 
         node = None
         if proc_name in nodes:
