@@ -118,7 +118,7 @@ def update_derived_type_procedures(nodes, filename):
         # Store the derived subtypes
         subtypes = dt_node.findall(".//component-decl-stmt")
         for subtype in subtypes:
-            if subtype.find(".//derived-T-spec") is None:
+            if subtype.find(".//derived-T-spec/T-N/N/n") is None:
                 continue
             subtypename = subtype.find(".//derived-T-spec/T-N/N/n").text.upper()
             varname = subtype.find(".//EN-decl-LT/EN-decl/EN-N/N/n").text.upper()
