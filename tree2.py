@@ -278,11 +278,20 @@ def analyze_file(filename, nodes, to_excludes):
             # sometimes the procedure is member of a type, the name is then not in the <n> tag but in the last <cat> tag of the call
             ct_nodes = call.findall(".//procedure-designator//ct")
 
-            if ct_nodes:
+            if ct_nodes and callee_name in local_vars_types:
                 mc = MethodCall(local_vars_types[callee_name])
                 for ct in ct_nodes:
                     mc.cts.append(ct.text.upper())
                 node.callees_chains_to_solve.append(mc)
+            elif ct_nodes:
+                unknown_source_callee = ct_nodes[:1][0].text.upper()
+                if unknown_source_callee in to_excludes:
+                    continue
+                node.add_callee(unknown_source_callee)
+                if verbose:
+                    print(
+                        f"Warning: couldn't find the type of the variable used to call {unknown_source_callee}"
+                    )
             else:
                 if callee_name in to_excludes:
                     continue
