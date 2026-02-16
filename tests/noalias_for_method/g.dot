@@ -1,0 +1,6 @@
+digraph G{
+node [shape=box, style=filled];
+MAIN -> P;
+MAIN[label="MAIN\nmain.F90"];
+P[label="P\nm.F90"];
+}

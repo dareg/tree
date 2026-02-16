@@ -123,9 +123,14 @@ def update_derived_type_procedures(nodes, filename):
         contained_procs = dt_node.findall(".//procedure-stmt/")
         for contained_proc in contained_procs:
             alias = contained_proc.find("./rename/use-N/n").text.upper()
-            name = contained_proc.find("./rename/N/n").text.upper()
-            dt.add_procedure(name, alias)
-            local_aliases[name] = alias
+            name = contained_proc.find("./rename/N/n")
+            if name is None:
+                # It means there is no alias for this method
+                dt.add_procedure(name=alias, alias=None)
+            else:
+                name = name.text.upper()
+                dt.add_procedure(name=name, alias=alias)
+                local_aliases[name] = alias
 
         derived_types[typename] = dt
     return local_aliases
@@ -298,6 +303,8 @@ def solve_method_calls(nodes):
 
             for proc in derived_types[cur_type].procedures:
                 if proc.alias == method_call.cts[-1]:
+                    nodes[node].add_callee(proc.name)
+                if proc.alias is None and proc.name == method_call.cts[-1]:
                     nodes[node].add_callee(proc.name)
 
 
