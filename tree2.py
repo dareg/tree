@@ -209,7 +209,6 @@ def remove_associate(procs):
             real_name = associate.find("./selector/named-E/N/n").text.upper()
             associates_ht[alias] = real_name
 
-        print(associates_ht)
         for n in associate_construct.findall(".//N/n"):
             if n.text in associates_ht:
                 n.text = associates_ht[n.text.upper()]
@@ -218,19 +217,6 @@ def remove_associate(procs):
         associate_construct.remove(to_delete)
         to_delete = associate_construct.find("./end-associate-stmt")
         associate_construct.remove(to_delete)
-
-        # parent = proc.find(".//associate-construct/..")
-        ##print(parent)
-        # inside_associate_construct = proc.findall(".//associate-construct/")
-        # for elt in parent:
-        #    ET.dump(elt)
-
-        # parent.remove(associate_construct)
-        # for elt in inside_associate_construct:
-        #    ET.dump(elt)
-        #    parent.extend(elt)
-
-        # ET.dump(proc)
 
 
 def analyze_file(filename, nodes, to_excludes):
@@ -328,7 +314,7 @@ def generate_dotfile(nodes, dotfile):
             # then we can also add the source file
             if callee in nodes and nodes[callee].hide:
                 label = build_label(callee)
-                line.append(f'{callee}[label="{label}"];\n')
+                lines.append(f'{callee}[label="{label}"];\n')
 
     lines = sorted(lines)
     fh = open(dotfile, "w")
@@ -551,8 +537,7 @@ def handle_cli_options():
     parser = argparse.ArgumentParser(
         prog="tree",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent(
-            """\
+        description=textwrap.dedent("""\
 Generate a call tree in a dot file from a pack or a directory containing
 Fortran code. Once the dot file is generated, one can use the dot command
 to generate an image, a pdf and so on:
@@ -564,8 +549,7 @@ the environment variable DR_HOOK must be set to 1 and DR_HOOK_OPT must be set
 to prof.
     export DR_HOOK=1
     export DR_HOOK_OPT=prof
-        """
-        ),
+        """),
     )
     parser.add_argument("-p", "--pack", metavar="PACK_DIRECTORY")
     parser.add_argument("-d", "--directory")
