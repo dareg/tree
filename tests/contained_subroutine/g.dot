@@ -1,0 +1,9 @@
+digraph G{
+node [shape=box, style=filled];
+S -> S2;
+S -> T_F;
+S2 -> T_F;
+S2[label="S2\nmain.F90"];
+S[label="S\nmain.F90"];
+T_F[label="T_F (aliased as F)\nm.F90"];
+}
